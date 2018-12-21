@@ -136,6 +136,7 @@ def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from
     run_sql.append(createsql)
     run_sql.append(opensql)
     #module.exit_json(msg=run_sql, changed=False)
+
     for a in run_sql:
         execute_sql(module, msg, cursor, a)
     if save_state:

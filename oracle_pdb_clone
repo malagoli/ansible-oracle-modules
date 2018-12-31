@@ -121,11 +121,13 @@ def quote_string(item):
     else:
         return value
 
-def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from_pdb, snapshot_copy):
+def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from_pdb, snapshot_copy, user, password, grants):
 
     run_sql = []
     opensql = 'alter pluggable database %s open instances=all' % (name)
     createsql = 'create pluggable database %s ' % (name)
+    connect = 'alter session set container= %s ' % (name)
+    create_user = 'create user %s identified by %s' % (user, password)
 
     if from_pdb is not None:
         createsql += ' from %s ' % (from_pdb)
@@ -135,6 +137,23 @@ def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from
 
     run_sql.append(createsql)
     run_sql.append(opensql)
+
+
+    if user is not None:
+        run_sql.append(connect)
+        run_sql.append(create_user)
+
+    if (grants):
+        grants_list=[]
+    	grants=clean_list(grants)
+    	for p in grants:
+    		grants_list.append(p)
+    	grants = ','.join(grants_list)
+
+        grants_sql = 'grant %s to %s '% (grants, user)
+        run_sql.append(grants_sql)
+
+
     #module.exit_json(msg=run_sql, changed=False)
 
     for a in run_sql:
@@ -229,6 +248,10 @@ def execute_sql(module, msg, cursor, sql):
         return False
     return True
 
+def clean_list(item):
+    item = [p.replace("'","").replace(", ",",").lstrip(" ").rstrip(",").replace("[","").replace("]","") for p in item]
+
+    return item
 
 
 def main():
@@ -249,7 +272,10 @@ def main():
             hostname               = dict(required=False, default = 'localhost', aliases = ['host']),
             port                   = dict(required=False, default = 1521),
             from_pdb               = dict(required=True),
-            snapshot_copy          = dict(required=False, default=False, type = 'bool')
+            snapshot_copy          = dict(required=False, default=False, type = 'bool'),
+            newuser                = dict(default=None),
+            newuser_password       = dict(default=None, no_log=True ),
+            grants         = dict(default=None, type="list")
 
 
         ),
@@ -269,7 +295,9 @@ def main():
     port                   = module.params["port"]
     from_pdb               = module.params["from_pdb"]
     snapshot_copy          = module.params["snapshot_copy"]
-
+    newuser                = module.params["newuser"]
+    newuser_password                = module.params["newuser_password"]
+    grants                = module.params["grants"]
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
@@ -320,7 +348,7 @@ def main():
 
     if state in ('present','closed', 'open', 'restricted','read_only','read_write'):
         if not check_pdb_exists(cursor, module, msg, name):
-            if clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from_pdb, snapshot_copy):
+            if clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from_pdb, snapshot_copy, newuser, newuser_password, grants):
                 ensure_pdb_state(cursor, module, msg, name, state, newpdb)
                 module.exit_json(msg=msg[0], changed=True)
             else:

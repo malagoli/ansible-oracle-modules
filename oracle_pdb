@@ -1,4 +1,4 @@
-#!/usr/bin/python
+
 # -*- coding: utf-8 -*-
 
 DOCUMENTATION = '''
@@ -122,15 +122,16 @@ oracle_pdb:
 
 '''
 import os
+ 
 
 try:
-    import cx_Oracle
+   import cx_Oracle
 except ImportError:
     cx_oracle_exists = False
 else:
     cx_oracle_exists = True
 
-
+ 
 # Check if the pdb exists
 def check_pdb_exists(cursor, module, msg, name):
     global newpdb
@@ -153,7 +154,7 @@ def quote_string(item):
         return value
 
 def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username,
-                pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert):
+                pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert, storage, cpu_count):
 
     run_sql = []
     opensql = 'alter pluggable database %s open instances=all' % (name)
@@ -177,9 +178,20 @@ def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_usern
         quoted = ",".join("'" + p + "'" for p in file_name_convert.split(","))
         createsql += ' file_name_convert = (%s)' % (quoted)
 
+    if storage is not None:
+        createsql += ' STORAGE(maxsize %sG)' % (storage)
+
     run_sql.append(createsql)
     run_sql.append(opensql)
+    
     #module.exit_json(msg=run_sql, changed=False)
+    connect = 'alter session set container= %s ' % (name)
+    cpu_count = 'alter system set cpu_count= %s' % (cpu_count)
+
+    if cpu_count is not None:
+       run_sql.append(connect)
+       run_sql.append(cpu_count)
+
     for a in run_sql:
         execute_sql(module, msg, cursor, a)
     if save_state:
@@ -310,9 +322,9 @@ def main():
             mode                   = dict(default="normal", choices = ["sysdba", "normal"]),
             service_name           = dict(required=False, aliases = ['sn']),
             hostname               = dict(required=False, default = 'localhost', aliases = ['host']),
-            port                   = dict(required=False, default = 1521)
-            
-
+            port                   = dict(required=False, default = 1521),
+            cpu_count              = dict(required=False),
+            storage                = dict(required=False, default = 1)
 
         ),
         mutually_exclusive=[['datafile_dest', 'file_name_convert']]
@@ -335,19 +347,20 @@ def main():
     service_name           = module.params["service_name"]
     hostname               = module.params["hostname"]
     port                   = module.params["port"]
-    
+    cpu_count              = module.params["cpu_count"]
+    storage                = module.params["storage"]
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
     elif 'ORACLE_HOME' in os.environ:
         oracle_home = os.environ['ORACLE_HOME']
     else:
-        msg[0] = 'ORACLE_HOME variable not set. Please set it and re-run the command'
+        msg[0] = 'ssssssORACLE_HOME variable not set. Please set it and re-run the command'
         module.fail_json(msg=msg[0], changed=False)
 
 
     if not cx_oracle_exists:
-        msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+        msg[0] = "qqqqqThe cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
         module.fail_json(msg=msg[0])
 
     if service_name == None:
@@ -387,7 +400,7 @@ def main():
 
     if state in ('present','closed', 'open', 'restricted','read_only','read_write'):
         if not check_pdb_exists(cursor, module, msg, name):
-            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert):
+            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert, storage, cpu_count):
                 ensure_pdb_state(cursor, module, msg, name, state, newpdb)
                 module.exit_json(msg=msg[0], changed=True)
             else:

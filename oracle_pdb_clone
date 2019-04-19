@@ -121,7 +121,7 @@ def quote_string(item):
     else:
         return value
 
-def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from_pdb, snapshot_copy, user, password, grants):
+def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from_pdb, file_nc, user, password, grants):
 
     run_sql = []
     opensql = 'alter pluggable database %s open instances=all' % (name)
@@ -132,8 +132,10 @@ def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from
     if from_pdb is not None:
         createsql += ' from %s ' % (from_pdb)
 
-    if snapshot_copy is not None:
-        createsql += ' snapshot copy '
+    if file_nc is None:
+        var =  'file_name_convert=( \'/%s/\',\'/%s/\' ) ' % (from_pdb, name)
+        s1 = var.upper()
+        createsql += s1
 
     run_sql.append(createsql)
     run_sql.append(opensql)
@@ -272,8 +274,8 @@ def main():
             hostname               = dict(required=False, default = 'localhost', aliases = ['host']),
             port                   = dict(required=False, default = 1521),
             from_pdb               = dict(required=True),
-            snapshot_copy          = dict(required=False, default=False, type = 'bool'),
-            newuser                = dict(default=None),
+            snapshot_copy          = dict(required=False, default=None),
+            newuser                = dict(default=None),  
             newuser_password       = dict(default=None, no_log=True ),
             grants         = dict(default=None, type="list")
 
@@ -297,8 +299,8 @@ def main():
     snapshot_copy          = module.params["snapshot_copy"]
     newuser                = module.params["newuser"]
     newuser_password                = module.params["newuser_password"]
-    grants                = module.params["grants"]
-
+    grants                 = module.params["grants"]
+    
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
     elif 'ORACLE_HOME' in os.environ:

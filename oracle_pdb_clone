@@ -132,10 +132,10 @@ def clone_pdb(cursor, module, msg, oracle_home, name, sourcedb, save_state, from
     if from_pdb is not None:
         createsql += ' from %s ' % (from_pdb)
 
-    if file_nc is None:
+    if file_nc is not None:
         var =  'file_name_convert=( \'/%s/\',\'/%s/\' ) ' % (from_pdb, name)
-        s1 = var.upper()
         createsql += s1
+        s1 = var.upper()
 
     run_sql.append(createsql)
     run_sql.append(opensql)

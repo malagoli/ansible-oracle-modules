@@ -154,11 +154,12 @@ def quote_string(item):
         return value
 
 def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username,
-                pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert, storage, cpu_count):
+                pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert, storage, cpu_count, new_user, new_user_pwd):
 
     run_sql = []
     opensql = 'alter pluggable database %s open instances=all' % (name)
     createsql = 'create pluggable database %s ' % (name)
+
 
     if unplug_dest is not None:
         createsql += ' using \'%s\' ' % (unplug_dest)
@@ -187,10 +188,12 @@ def create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_usern
     #module.exit_json(msg=run_sql, changed=False)
     connect = 'alter session set container= %s ' % (name)
     cpu_count = 'alter system set cpu_count= %s' % (cpu_count)
+    create_user = 'create user %s identified by %s' % (new_user, new_user_pwd)
 
     if cpu_count is not None:
        run_sql.append(connect)
        run_sql.append(cpu_count)
+       run_sql.append(create_user)
 
     for a in run_sql:
         execute_sql(module, msg, cursor, a)
@@ -324,7 +327,9 @@ def main():
             hostname               = dict(required=False, default = 'localhost', aliases = ['host']),
             port                   = dict(required=False, default = 1521),
             cpu_count              = dict(required=False),
-            storage                = dict(required=False, default = 1)
+            storage                = dict(required=False, default = 1),
+            new_user               = dict(required=False),
+            new_user_pwd           = dict(required=False)
 
         ),
         mutually_exclusive=[['datafile_dest', 'file_name_convert']]
@@ -349,6 +354,8 @@ def main():
     port                   = module.params["port"]
     cpu_count              = module.params["cpu_count"]
     storage                = module.params["storage"]
+    new_user               = module.params["new_user"]
+    new_user_pwd           = module.params["new_user_pwd"]
 
     if oracle_home is not None:
         os.environ['ORACLE_HOME'] = oracle_home
@@ -360,7 +367,7 @@ def main():
 
 
     if not cx_oracle_exists:
-        msg[0] = "qqqqqThe cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
+        msg[0] = "The cx_Oracle module is required. 'pip install cx_Oracle' should do the trick. If cx_Oracle is installed, make sure ORACLE_HOME & LD_LIBRARY_PATH is set"
         module.fail_json(msg=msg[0])
 
     if service_name == None:
@@ -400,7 +407,7 @@ def main():
 
     if state in ('present','closed', 'open', 'restricted','read_only','read_write'):
         if not check_pdb_exists(cursor, module, msg, name):
-            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert, storage, cpu_count):
+            if create_pdb(cursor, module, msg, oracle_home, name, sourcedb, pdb_admin_username, pdb_admin_password, datafile_dest, save_state, unplug_dest, file_name_convert, storage, cpu_count, new_user, new_user_pwd):
                 ensure_pdb_state(cursor, module, msg, name, state, newpdb)
                 module.exit_json(msg=msg[0], changed=True)
             else:
